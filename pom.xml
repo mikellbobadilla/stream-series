@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>ar.app</groupId>
 	<artifactId>stream-series</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.1</version>
 	<name>stream-series</name>
 	<description>Demo project for Spring Boot</description>
 	<properties>
