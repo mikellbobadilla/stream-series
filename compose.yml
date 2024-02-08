@@ -1,0 +1,15 @@
+version: '3.1'
+
+services:
+  db:
+    image: postgres
+    restart: 'no'
+    container_name: series_db
+    environment:
+      POSTGRES_USER: serieUser
+      POSTGRES_PASSWORD: seriePassword
+      POSTGRES_DB: series_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - './postgres_data:/var/lib/postgresql/data'
