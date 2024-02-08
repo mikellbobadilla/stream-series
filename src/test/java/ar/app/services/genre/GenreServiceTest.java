@@ -7,7 +7,6 @@ import ar.app.exceptions.genre.GenreException;
 import ar.app.exceptions.genre.GenreNotFoundException;
 import ar.app.models.genre.GenreModel;
 import ar.app.repositories.genre.GenreRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
