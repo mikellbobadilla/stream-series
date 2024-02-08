@@ -23,7 +23,7 @@ public class GenreService {
         --page;
 
         if (page < 0) {
-            throw new GenreException("Page cannot be less than 0");
+            throw new GenreException("Page cannot be less than 1");
         }
 
         Pageable pageable = PageRequest.of(page, size);
