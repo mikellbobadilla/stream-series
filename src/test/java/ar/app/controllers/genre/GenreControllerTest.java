@@ -1,73 +1,242 @@
 package ar.app.controllers.genre;
 
-import ar.app.dtos.genre.GenreResponse;
-import ar.app.dtos.genre.PageGenre;
+import ar.app.dtos.genre.GenreRequest;
+import ar.app.models.genre.GenreModel;
 import ar.app.repositories.genre.GenreRepository;
-import ar.app.services.genre.GenreService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ExtendWith(MockitoExtension.class)
 @ActiveProfiles("test")
 class GenreControllerTest {
 
-    @Mock
-    private GenreService service;
-    @InjectMocks
-    private GenreController controller;
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private GenreRepository repository;
+
+
     @Test
     void loadContext() {
-        assertNotNull(service);
-        assertNotNull(controller);
         assertNotNull(mockMvc);
+        assertNotNull(repository);
+
     }
 
+    @DirtiesContext
     @Test
-    public void testGetGenres() throws Exception {
-        PageGenre pageGenre = PageGenre.builder()
-                .content(List.of(new GenreResponse(1L, "acción")))
-                .pageNumber(1)
-                .pageSize(10)
-                .totalPages(1)
-                .totalElements(1)
+    void testGetGenres() throws Exception {
+
+        mockMvc.perform(MockMvcRequestBuilders
+                        .get("/genres")
+                        .param("page", "1")
+                        .param("size", "10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                ).andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+    }
+
+    @DirtiesContext
+    @Test
+    void testGetGenresBadRequest() throws Exception {
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/genres")
+                .param("page", "0")
+                .param("size", "10")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                .andReturn();
+
+    }
+
+    @DirtiesContext
+    @Test
+    void testGetGenresPageNotFound() throws Exception {
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/genres")
+                .param("page", "2")
+                .param("size", "10")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andReturn();
+
+    }
+
+    @DirtiesContext
+    @Test
+    void testCreateGenre() throws Exception {
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        String json = mapper.writeValueAsString(new GenreRequest("acción"));
+
+        mockMvc.perform(MockMvcRequestBuilders
+                .post("/genres")
+                .content(json)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isCreated())
+                .andExpect(MockMvcResultMatchers.jsonPath("$.name").value("acción"))
+                .andReturn();
+    }
+
+    @DirtiesContext
+    @Test
+    void testCreateGenreByNameNull() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        String json = mapper.writeValueAsString(new GenreRequest(null));
+
+        mockMvc.perform(MockMvcRequestBuilders
+                        .post("/genres")
+                        .content(json)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                .andReturn();
+
+    }
+
+    @Nested
+    class NestedTest {
+
+        private static GenreModel model = GenreModel.builder()
+                .id(1L)
+                .name("acción")
                 .build();
-        doReturn(pageGenre).when(service).getGenres(1, 10);
 
-        var response = controller.genres(1, 10);
+        @BeforeEach
+        void persistGenre() {
+            model = repository.saveAndFlush(model);
+        }
 
-        verify(service, atLeastOnce()).getGenres(1, 10);
+        @AfterEach
+        void removeGenre() {
+            assertNotNull(model);
+            repository.delete(model);
+        }
 
-//        mockMvc.perform(MockMvcRequestBuilders
-//                        .get("/genres")
-//                        .param("page", "1")
-//                        .param("size", "10")
-//                        .contentType(MediaType.APPLICATION_JSON)
-//                ).andExpect(MockMvcResultMatchers.status().isOk())
-//                .andReturn().getResponse();
+        @DirtiesContext
+        @Test
+        void testCreateGenreExists() throws Exception {
+            ObjectMapper mapper = new ObjectMapper();
+            String json = mapper.writeValueAsString(new GenreRequest(model.getName()));
 
+            mockMvc.perform(MockMvcRequestBuilders
+                            .post("/genres")
+                            .content(json)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andReturn();
 
+        }
+
+        @DirtiesContext
+        @Test
+        void testGetGenreById() throws Exception {
+            mockMvc.perform(MockMvcRequestBuilders
+                            .get("/genres/" + model.getId())
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.name").value(model.getName()))
+                    .andReturn();
+        }
+
+        @DirtiesContext
+        @Test
+        void testGenreNotFound() throws Exception {
+
+            mockMvc.perform(MockMvcRequestBuilders
+                            .get("/genres/2")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(MockMvcResultMatchers.status().isNotFound())
+                    .andReturn();
+        }
+
+        @DirtiesContext
+        @Test
+        void testUpdateGenreById() throws Exception {
+
+            ObjectMapper mapper = new ObjectMapper();
+            String json = mapper.writeValueAsString(new GenreRequest("ficción"));
+
+            mockMvc.perform(MockMvcRequestBuilders
+                            .put("/genres/" + model.getId())
+                            .content(json)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(MockMvcResultMatchers.status().isNoContent())
+                    .andReturn();
+
+            mockMvc.perform(MockMvcRequestBuilders
+                            .get("/genres/1")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(MockMvcResultMatchers.status().isOk())
+                    .andExpect(MockMvcResultMatchers.jsonPath("$.name").value("ficción"))
+                    .andReturn();
+        }
+
+        @DirtiesContext
+        @Test
+        void testUpdateGenreNotFound() throws Exception {
+
+            ObjectMapper mapper = new ObjectMapper();
+            String json = mapper.writeValueAsString(new GenreRequest("ficción"));
+
+            mockMvc.perform(MockMvcRequestBuilders
+                            .put("/genres/2")
+                            .content(json)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(MockMvcResultMatchers.status().isNotFound())
+                    .andReturn();
+        }
+
+        @DirtiesContext
+        @Test
+        void testUpdateGenreByNameNull() throws Exception {
+            ObjectMapper mapper = new ObjectMapper();
+            String json = mapper.writeValueAsString(new GenreRequest(null));
+
+            mockMvc.perform(MockMvcRequestBuilders
+                            .put("/genres/" + model.getId())
+                            .content(json)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(MockMvcResultMatchers.status().isBadRequest())
+                    .andReturn();
+        }
+
+        @DirtiesContext
+        @Test
+        void testDeleteGenreById() throws Exception {
+            mockMvc.perform(MockMvcRequestBuilders
+                            .delete("/genres/" + model.getId())
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(MockMvcResultMatchers.status().isNoContent())
+                    .andReturn();
+        }
+
+        @DirtiesContext
+        @Test
+        void testDeleteGenreNotFound() throws Exception {
+
+            mockMvc.perform(MockMvcRequestBuilders
+                            .delete("/genres/2")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(MockMvcResultMatchers.status().isNotFound())
+                    .andReturn();
+        }
     }
 }
